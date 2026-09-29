@@ -1,35 +1,51 @@
-# Mini-GPT for Tiny Shakespeare (Task 1)
+# Mini-GPT para Tiny Shakespeare
 
-Este proyecto contiene la solución al Task 1. Todo se ha estructurado utilizando buenas prácticas de ingeniería de software para facilitar el desarrollo posterior del Task 2.
+Implementación de un modelo GPT mínimo a nivel de carácter para los Tasks 1 y 2. El modelo usa vocabulario de 65 caracteres, atención causal multicabeza y tres bloques Transformer.
 
-## Estructura del Proyecto
+## Contenido
 
-*   `src/data.py`: Contiene la clase `TinyShakespeareDataset` que maneja el dataset, el vocabulario de caracteres únicos (exactamente 65), los mappings bidireccionales, la partición 90/10 respetando orden temporal y la generación de batches desplazados.
-*   `src/model.py`: Contiene la implementación de `MiniGPT`, adaptada para soportar arquitecturas multicapa (`n_layers`), atenciones multicabeza (`n_heads`), máscara causal y operaciones en batch (`batch_size`).
-*   `src/train.py`: Script principal para ejecutar el pipeline de entrenamiento del modelo utilizando los hiperparámetros mínimos requeridos.
-*   `input.txt`: El dataset completo de Tiny Shakespeare.
-*   `resultados/`: Carpeta (creada automáticamente) donde se guardan los pesos de la red y la gráfica de pérdida.
-*   `.gitignore`: Configurado para ignorar caché, los entornos virtuales, el archivo de dataset crudo y los pesos del modelo, dejando todo limpio.
+- `src/data.py`: descarga el corpus, crea los mapeos carácter/índice, conserva el orden temporal en la partición 90/10 y genera batches `X`, `Y` desplazados.
+- `src/model.py`: Mini-GPT con `block_size=128`, `d_model=128`, `n_heads=4` y `n_layers=3`.
+- `src/train.py`: entrena durante 10 épocas, muestra pérdidas y perplejidad, y guarda el checkpoint y la gráfica.
+- `src/sampling.py`: implementaciones desde cero de greedy, top-k y top-p con temperatura.
+- `src/generate.py`: función `generate(prompt, max_new_tokens, strategy, **kwargs)` y cargador del modelo entrenado.
+- `src/generate_samples.py`: produce las cinco muestras de 200 caracteres para cada configuración del Task 2.1.
+- `RESPUESTAS.md`: análisis teórico solicitado en el Task 2.2, con referencias a las muestras generadas.
 
-## Cómo Ejecutar y Presentar el Task 1
+## Requisitos
 
-1.  **Correr el Entrenamiento**:
-    Navega a la carpeta de código y ejecuta el script de entrenamiento:
-    ```bash
-    cd src
-    python train.py
-    ```
+Python 3.10+ con PyTorch y Matplotlib:
 
-2.  **Qué Presentar**:
-    *   **Evidencias en consola (Task 1.1)**: En tu consola o notebook, pega las líneas que imprime este script al inicio donde confirma el tamaño de vocabulario (65) y los tamaños de los splits (90/10), así como el ejemplo que muestra el desplazamiento de batch X vs Y.
-    *   **Curva de pérdida (Task 1.2)**: Adjunta la imagen `loss_curve.png` guardada en la carpeta `resultados/`. *Breve análisis*: Podrás notar que la curva de validación desciende a la par que la de entrenamiento sin separarse (no hay overfitting notable en estas 10 épocas) lo cual es indicativo de un modelo sano para este dataset.
-    *   **Perplejidad (Task 1.2)**: El script imprime automáticamente la **Perplejidad de Validación Final** en la consola tras finalizar (debería salirte un valor de ~8.0, perfectamente dentro del rango 3.5 a 8.0 que piden).
-    *   **Funciones de Muestreo (Task 1.3)**: Puedes mostrar el contenido del archivo `src/sampling.py` donde se han programado desde cero las tres estrategias (`greedy`, `top_k`, `top_p`) procesando los logits crudos según sus definiciones matemáticas precisas.
+```bash
+pip install torch matplotlib
+```
 
-## Notas para la Persona Asignada al Task 2
+## Ejecución
 
-La estructura dejada facilita directamente la construcción del generador de texto (Task 2):
-1. Podrá importar `MiniGPT` y `TinyShakespeareDataset` de manera limpia.
-2. Deberá instanciar la clase del dataset (para acceso a `encode` y `decode`) y el modelo.
-3. Podrá cargar el estado del modelo pre-entrenado desde `resultados/minigpt_weights.pth` usando `model.load_state_dict()` para no tener que volver a entrenar.
-4. Con el modelo cargado, podrá implementar su función `generate(prompt, max_new_tokens, strategy, **kwargs)` en un nuevo archivo (por ejemplo, `src/generate.py`) basándose en los outputs del modelo y aplicando las lógicas de Greedy, Top-K y Top-P.
+Desde la raíz del repositorio, entrene el modelo. Si `input.txt` no existe, el script descarga el corpus oficial automáticamente.
+
+```bash
+cd src
+python train.py
+```
+
+Esto crea `resultados/minigpt_weights.pth` y `resultados/loss_curve.png`. Una vez que el checkpoint existe, genere las 25 muestras del Task 2:
+
+```bash
+cd src
+python generate_samples.py
+```
+
+El resultado se guarda en `resultados/task2_samples.md`. Cada muestra contiene `ROMEO:` seguido de exactamente 200 caracteres nuevos. Las semillas están fijadas por muestra para que los resultados estocásticos se puedan reproducir.
+
+## Estrategias disponibles
+
+| Configuración | Estrategia | Parámetros |
+| --- | --- | --- |
+| A | greedy | — |
+| B | top-k | `k=5`, `tau=0.7` |
+| C | top-k | `k=50`, `tau=1.0` |
+| D | top-p | `p=0.70`, `tau=0.7` |
+| E | top-p | `p=0.95`, `tau=1.0` |
+
+`generate` conserva como contexto únicamente los últimos 128 tokens, que es el máximo admitido por el modelo. Para usarla desde otro script, cree un `TextGenerator` con `load_generator` o llame `configure_generator(model, dataset, device)` antes de invocar la función global.

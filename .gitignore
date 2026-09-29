@@ -10,5 +10,6 @@ venv/
 *.pdf
 .ipynb_checkpoints/
 input.txt
-resultados/
+resultados/*
+!resultados/task2_samples.md
 *.pth
